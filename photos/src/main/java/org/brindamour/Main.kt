@@ -1,5 +1,6 @@
 package org.brindamour
 
+import org.brindamour.extensions.unaccent
 import org.brindamour.timestamp.*
 import java.io.File
 import java.nio.file.Files
@@ -11,11 +12,14 @@ object Main {
         val isValidateNames = args.getOrNull(optionIndex) == "-v"
         val isCreateUploadFolders = args.getOrNull(optionIndex) == "-e"
         val isValidateStudentsPhotoCount = args.getOrNull(optionIndex) == "-p"
+        val isExportGpi = args.getOrNull(optionIndex) == "-s"
 
         val photoshootDirectory = File(args[timestampFileIndex])
 
         if (isValidateStudentsPhotoCount) {
             validateStudentsPhotoCount(args, photoshootDirectory)
+        } else if (isExportGpi) {
+            exportGpi(args, photoshootDirectory)
         } else {
             val timestampFile = File(args[timestampFileIndex])
                 .listFiles { _, name -> name.endsWith(".xlsx") }?.firstOrNull()
@@ -64,10 +68,7 @@ object Main {
 
         val studentReader = StudentsExcelFileReader()
         val students = studentReader.read(timestampFile)
-        validateStudentsPhotoCount(photoshootDirectory, students)
-    }
 
-    private fun validateStudentsPhotoCount(photoshootDirectory: File, students: List<Student>) {
         val uploadDirectory = File(photoshootDirectory, "ToUpload")
         val studentPhotoCount = students.mapNotNull { student ->
             if (student.isStudentKnown) {
@@ -81,6 +82,37 @@ object Main {
         }.sortedBy(StudentPhotoCount::photoCount)
 
         studentPhotoCount.forEach(::println)
+    }
+
+    private fun exportGpi(args: Array<String>, photoshootDirectory: File) {
+        val timestampFile = File(args[timestampFileIndex])
+            .listFiles { _, name -> name.endsWith("MASTER.xlsx") }?.firstOrNull()
+
+        if (timestampFile == null) {
+            println("Aucun fichier excel trouvé dans ce répertoire.")
+            exitProcess(-1)
+        }
+
+        val studentReader = StudentsExcelFileReader()
+        val students = studentReader.read(timestampFile)
+
+        val targetDirectory = File(photoshootDirectory, "GPI")
+        if (targetDirectory.exists()) {
+            targetDirectory.deleteRecursively()
+        }
+        Files.createDirectory(targetDirectory.toPath())
+
+        val uploadDirectory = File(photoshootDirectory, "ToUpload")
+        students.forEach { student ->
+            if (student.isStudentKnown) {
+                val studentDirectory = File(uploadDirectory, "Classe ${student.group}/Eleve ${student.id}")
+                studentDirectory.listFiles { _, name -> name.endsWith(".jpg") }?.sortedBy { it.name }?.firstOrNull()
+                    ?.let {
+                        val targetFile = File(targetDirectory, "${student.id}.jpg")
+                        it.copyTo(targetFile)
+                    }
+            }
+        }
     }
 
     private fun createNameValidationFiles(photoshootDirectory: File, timestampMatches: List<TimestampMatch>) {
@@ -128,7 +160,10 @@ object Main {
                     }
 
                     val studentPhotoFile =
-                        File(studentFolder, "${match.timestamp.id}_${match.timestamp.name}_${studentPhoto.file.name}")
+                        File(
+                            studentFolder,
+                            "${match.timestamp.id}_${match.timestamp.name?.unaccent()}_${studentPhoto.file.name}"
+                        )
                     studentPhoto.file.copyTo(studentPhotoFile)
 
                     return@studentLoop

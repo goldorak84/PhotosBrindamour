@@ -9,10 +9,11 @@ import kotlin.system.exitProcess
 object Main {
     @JvmStatic
     fun main(args: Array<String>) {
-        val isValidateNames = args.getOrNull(optionIndex) == "-v"
-        val isCreateUploadFolders = args.getOrNull(optionIndex) == "-e"
-        val isValidateStudentsPhotoCount = args.getOrNull(optionIndex) == "-p"
-        val isExportGpi = args.getOrNull(optionIndex) == "-s"
+        val isSimpleExcelExport = args.any { it == "-x" }
+        val isValidateNames = args.any { it == "-v" }
+        val isCreateUploadFolders = args.any { it == "-e" }
+        val isValidateStudentsPhotoCount = args.any { it == "-p" }
+        val isExportGpi = args.any { it == "-s" }
 
         val photoshootDirectory = File(args[timestampFileIndex])
 
@@ -29,30 +30,42 @@ object Main {
                 exitProcess(-1)
             }
 
-            val nameTagsPath = File(photoshootDirectory, "Noms")
-            if (!nameTagsPath.exists()) {
-                println("Dossier 'Noms' manquant.")
-                exitProcess(-1)
-            }
+            if (isSimpleExcelExport) {
+                val photoshootReader = PhotoshootExcelFileReader()
+                val timestamps = photoshootReader.read(timestampFile)
 
-            val photoshootReader = PhotoshootExcelFileReader()
-            val timestamps = photoshootReader.read(timestampFile)
+                if (isCreateUploadFolders) {
+                    val studentPhotoPath = File(photoshootDirectory, "Eleves")
+                    val studentsPhotosReader = StudentsPhotosReader()
+                    val studentsPhotos = studentsPhotosReader.readStudentsPhotos(studentPhotoPath)
+                    createSimpleUploadDirectoryStructure(photoshootDirectory, studentsPhotos, timestamps)
+                }
+            } else {
+                val nameTagsPath = File(photoshootDirectory, "Noms")
+                if (!nameTagsPath.exists()) {
+                    println("Dossier 'Noms' manquant.")
+                    exitProcess(-1)
+                }
 
-            val nameTagsReader = NameTagsReader(false)
-            val nameTags = nameTagsReader.readNameTags(nameTagsPath)
+                val photoshootReader = PhotoshootExcelFileReader()
+                val timestamps = photoshootReader.read(timestampFile)
 
-            val photoshoot = Photoshoot(timestamps, nameTags)
-            val timestampMatch = photoshoot.matchTimestampsAndNameTags()
+                val nameTagsReader = NameTagsReader(false)
+                val nameTags = nameTagsReader.readNameTags(nameTagsPath)
 
-            if (isValidateNames) {
-                createNameValidationFiles(photoshootDirectory, timestampMatch)
-            }
+                val photoshoot = Photoshoot(timestamps, nameTags)
+                val timestampMatch = photoshoot.matchTimestampsAndNameTags()
 
-            if (isCreateUploadFolders) {
-                val studentPhotoPath = File(photoshootDirectory, "Eleves")
-                val studentsPhotosReader = StudentsPhotosReader()
-                val studentsPhotos = studentsPhotosReader.readStudentsPhotos(studentPhotoPath)
-                createUploadDirectoryStructure(photoshootDirectory, studentsPhotos, timestampMatch)
+                if (isValidateNames) {
+                    createNameValidationFiles(photoshootDirectory, timestampMatch)
+                }
+
+                if (isCreateUploadFolders) {
+                    val studentPhotoPath = File(photoshootDirectory, "Eleves")
+                    val studentsPhotosReader = StudentsPhotosReader()
+                    val studentsPhotos = studentsPhotosReader.readStudentsPhotos(studentPhotoPath)
+                    createUploadDirectoryStructure(photoshootDirectory, studentsPhotos, timestampMatch)
+                }
             }
         }
     }
@@ -130,11 +143,52 @@ object Main {
         }
     }
 
+    private fun createSimpleUploadDirectoryStructure(
+        photoshootDirectory: File,
+        studentsPhotos: List<StudentPhoto>,
+        timestamps: List<Timestamp>
+    ) {
+        println("Création du fichier Upload et association des photos...")
+        val uploadFolder = File(photoshootDirectory, "Upload")
+        if (uploadFolder.exists()) {
+            uploadFolder.deleteRecursively()
+        }
+        Files.createDirectory(uploadFolder.toPath())
+
+        studentsPhotos.forEach studentLoop@{ studentPhoto ->
+            timestamps.singleOrNull { timestamp -> studentPhoto.date >= timestamp.timestampStart && studentPhoto.date < timestamp.timestampEnd }
+                ?.let { timestamp ->
+
+                    val classroomFolder = File(uploadFolder, "Classe ${timestamp.group}")
+                    if (!classroomFolder.exists()) {
+                        Files.createDirectory(classroomFolder.toPath())
+                    }
+
+                    val studentFolder = File(classroomFolder, "Eleve ${timestamp.id}")
+                    if (!studentFolder.exists()) {
+                        Files.createDirectory(studentFolder.toPath())
+                    }
+
+                    val studentPhotoFile =
+                        File(
+                            studentFolder,
+                            "${timestamp.id}_${timestamp.name?.unaccent()}_${studentPhoto.file.name}"
+                        )
+                    studentPhoto.file.copyTo(studentPhotoFile)
+                } ?: run {
+                println("Photo ${studentPhoto.file.name} non trouvée dans le fichier timestamp")
+            }
+        }
+        println("Création du fichier Upload et association des photos terminée!")
+    }
+
     private fun createUploadDirectoryStructure(
         photoshootDirectory: File,
         studentsPhotos: List<StudentPhoto>,
         timestampMatches: List<TimestampMatch>
     ) {
+        println("Création du fichier Upload et association des photos...")
+
         val uploadFolder = File(photoshootDirectory, "Upload")
         if (uploadFolder.exists()) {
             uploadFolder.deleteRecursively()
@@ -170,8 +224,9 @@ object Main {
                 }
             }
         }
+
+        println("Création du fichier Upload et association des photos terminée!")
     }
 
     private const val timestampFileIndex = 0
-    private const val optionIndex = 1
 }

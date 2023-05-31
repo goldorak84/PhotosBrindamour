@@ -64,7 +64,7 @@ class PhotoshootExcelFileReader {
         const val idCellIndex = 0
         const val nameCellIndex = 1
         const val groupCellIndex = 2
-        const val timestampStartIndex = 3
-        const val timestampEndIndex = 4
+        const val timestampStartIndex = 6
+        const val timestampEndIndex = 7
     }
 }

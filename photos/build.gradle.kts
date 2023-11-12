@@ -1,6 +1,6 @@
 plugins {
-    id("java")
     kotlin("jvm") version "1.7.20"
+    application
 }
 
 group = "org.brindamour"
@@ -8,6 +8,10 @@ version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
+}
+
+application {
+    mainClass.set("org.brindamour.Main")
 }
 
 dependencies {

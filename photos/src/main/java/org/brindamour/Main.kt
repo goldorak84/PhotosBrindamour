@@ -11,10 +11,14 @@ object Main {
     fun main(args: Array<String>) {
         val isSimpleExcelExport = args.any { it == "-x" }
         val isValidateNames = args.any { it == "-v" }
-        val isCreateUploadFolders = args.any { it == "-e" }
+        val createUploadFolders = args.any { it == "-e" }
         val isValidateStudentsPhotoCount = args.any { it == "-p" }
         val isExportGpi = args.any { it == "-s" }
 
+        if (args.lastIndex < timestampFileIndex) {
+            println("Aucun fichier excel spécifié.")
+            exitProcess(-1)
+        }
         val photoshootDirectory = File(args[timestampFileIndex])
 
         if (isValidateStudentsPhotoCount) {
@@ -23,32 +27,28 @@ object Main {
             exportGpi(args, photoshootDirectory)
         } else {
             val timestampFile = File(args[timestampFileIndex])
-                .listFiles { _, name -> name.endsWith(".xlsx") }?.firstOrNull()
+                    .listFiles { _, name -> name.endsWith(".xlsx") }?.firstOrNull()
 
             if (timestampFile == null) {
                 println("Aucun fichier excel trouvé dans ce répertoire.")
                 exitProcess(-1)
             }
 
-            if (isSimpleExcelExport) {
-                val photoshootReader = PhotoshootExcelFileReader()
-                val timestamps = photoshootReader.read(timestampFile)
+            val photoshootReader = PhotoshootExcelFileReader()
+            val timestamps = photoshootReader.read(timestampFile)
 
-                if (isCreateUploadFolders) {
-                    val studentPhotoPath = File(photoshootDirectory, "Eleves")
-                    val studentsPhotosReader = StudentsPhotosReader()
-                    val studentsPhotos = studentsPhotosReader.readStudentsPhotos(studentPhotoPath)
-                    createSimpleUploadDirectoryStructure(photoshootDirectory, studentsPhotos, timestamps)
-                }
+            if (isSimpleExcelExport) {
+
+                val studentPhotoPath = File(photoshootDirectory, "Eleves")
+                val studentsPhotosReader = StudentsPhotosReader()
+                val studentsPhotos = studentsPhotosReader.readStudentsPhotos(studentPhotoPath)
+                matchStudentPhotosAndTimestamps(photoshootDirectory, studentsPhotos, timestamps, createUploadFolders)
             } else {
                 val nameTagsPath = File(photoshootDirectory, "Noms")
                 if (!nameTagsPath.exists()) {
                     println("Dossier 'Noms' manquant.")
                     exitProcess(-1)
                 }
-
-                val photoshootReader = PhotoshootExcelFileReader()
-                val timestamps = photoshootReader.read(timestampFile)
 
                 val nameTagsReader = NameTagsReader(false)
                 val nameTags = nameTagsReader.readNameTags(nameTagsPath)
@@ -60,7 +60,7 @@ object Main {
                     createNameValidationFiles(photoshootDirectory, timestampMatch)
                 }
 
-                if (isCreateUploadFolders) {
+                if (createUploadFolders) {
                     val studentPhotoPath = File(photoshootDirectory, "Eleves")
                     val studentsPhotosReader = StudentsPhotosReader()
                     val studentsPhotos = studentsPhotosReader.readStudentsPhotos(studentPhotoPath)
@@ -72,7 +72,7 @@ object Main {
 
     private fun validateStudentsPhotoCount(args: Array<String>, photoshootDirectory: File) {
         val timestampFile = File(args[timestampFileIndex])
-            .listFiles { _, name -> name.endsWith("MASTER.xlsx") }?.firstOrNull()
+                .listFiles { _, name -> name.startsWith("Master") && name.endsWith(".xlsx") }?.firstOrNull()
 
         if (timestampFile == null) {
             println("Aucun fichier excel trouvé dans ce répertoire.")
@@ -99,7 +99,7 @@ object Main {
 
     private fun exportGpi(args: Array<String>, photoshootDirectory: File) {
         val timestampFile = File(args[timestampFileIndex])
-            .listFiles { _, name -> name.endsWith("MASTER.xlsx") }?.firstOrNull()
+                .listFiles { _, name -> name.startsWith("Master") && name.endsWith(".xlsx") }?.firstOrNull()
 
         if (timestampFile == null) {
             println("Aucun fichier excel trouvé dans ce répertoire.")
@@ -120,10 +120,10 @@ object Main {
             if (student.isStudentKnown) {
                 val studentDirectory = File(uploadDirectory, "Classe ${student.group}/Eleve ${student.id}")
                 studentDirectory.listFiles { _, name -> name.endsWith(".jpg") }?.sortedBy { it.name }?.firstOrNull()
-                    ?.let {
-                        val targetFile = File(targetDirectory, "${student.id}.jpg")
-                        it.copyTo(targetFile)
-                    }
+                        ?.let {
+                            val targetFile = File(targetDirectory, "${student.id}.jpg")
+                            it.copyTo(targetFile)
+                        }
             }
         }
     }
@@ -143,49 +143,65 @@ object Main {
         }
     }
 
-    private fun createSimpleUploadDirectoryStructure(
-        photoshootDirectory: File,
-        studentsPhotos: List<StudentPhoto>,
-        timestamps: List<Timestamp>
+    private fun matchStudentPhotosAndTimestamps(
+            photoshootDirectory: File,
+            studentsPhotos: List<StudentPhoto>,
+            timestamps: List<Timestamp>,
+            createUploadFolders: Boolean,
     ) {
-        println("Création du fichier Upload et association des photos...")
+        if(createUploadFolders) {
+            println("Création du fichier Upload et association des photos...")
+        } else {
+            println("Association des photos...")
+        }
         val uploadFolder = File(photoshootDirectory, "Upload")
         if (uploadFolder.exists()) {
             uploadFolder.deleteRecursively()
         }
-        Files.createDirectory(uploadFolder.toPath())
+        if (createUploadFolders) {
+            Files.createDirectory(uploadFolder.toPath())
+        }
 
         studentsPhotos.forEach studentLoop@{ studentPhoto ->
             timestamps.singleOrNull { timestamp -> studentPhoto.date >= timestamp.timestampStart && studentPhoto.date < timestamp.timestampEnd }
-                ?.let { timestamp ->
+                    ?.let { timestamp ->
 
-                    val classroomFolder = File(uploadFolder, "Classe ${timestamp.group}")
-                    if (!classroomFolder.exists()) {
-                        Files.createDirectory(classroomFolder.toPath())
-                    }
+                        if (!timestamp.isStudentKnown) {
+                            println("Photo(${studentPhoto.file.name}, barcode ${timestamp.id}) trouvée, mais aucune fiche d'élève trouvée")
+                        } else if (createUploadFolders) {
+                            val classroomFolder = File(uploadFolder, "Classe ${timestamp.group}")
+                            if (!classroomFolder.exists()) {
+                                Files.createDirectory(classroomFolder.toPath())
+                            }
 
-                    val studentFolder = File(classroomFolder, "Eleve ${timestamp.id}")
-                    if (!studentFolder.exists()) {
-                        Files.createDirectory(studentFolder.toPath())
-                    }
+                            val studentFolder = File(classroomFolder, "Eleve ${timestamp.id}")
+                            if (!studentFolder.exists()) {
+                                Files.createDirectory(studentFolder.toPath())
+                            }
 
-                    val studentPhotoFile =
-                        File(
-                            studentFolder,
-                            "${timestamp.id}_${timestamp.name?.unaccent()}_${studentPhoto.file.name}"
-                        )
-                    studentPhoto.file.copyTo(studentPhotoFile)
-                } ?: run {
+                            val studentPhotoFile =
+                                    File(
+                                            studentFolder,
+                                            "${timestamp.id}_${timestamp.name?.unaccent()}_${studentPhoto.file.name}"
+                                    )
+                            studentPhoto.file.copyTo(studentPhotoFile)
+                        }
+                    } ?: run {
                 println("Photo ${studentPhoto.file.name} non trouvée dans le fichier timestamp")
             }
         }
-        println("Création du fichier Upload et association des photos terminée!")
+
+        if(createUploadFolders) {
+            println("Création du fichier Upload et association des photos terminée!")
+        } else {
+            println("Association des photos terminée!")
+        }
     }
 
     private fun createUploadDirectoryStructure(
-        photoshootDirectory: File,
-        studentsPhotos: List<StudentPhoto>,
-        timestampMatches: List<TimestampMatch>
+            photoshootDirectory: File,
+            studentsPhotos: List<StudentPhoto>,
+            timestampMatches: List<TimestampMatch>
     ) {
         println("Création du fichier Upload et association des photos...")
 
@@ -214,10 +230,10 @@ object Main {
                     }
 
                     val studentPhotoFile =
-                        File(
-                            studentFolder,
-                            "${match.timestamp.id}_${match.timestamp.name?.unaccent()}_${studentPhoto.file.name}"
-                        )
+                            File(
+                                    studentFolder,
+                                    "${match.timestamp.id}_${match.timestamp.name?.unaccent()}_${studentPhoto.file.name}"
+                            )
                     studentPhoto.file.copyTo(studentPhotoFile)
 
                     return@studentLoop

@@ -11,8 +11,10 @@ import java.io.File
 import java.io.FileInputStream
 
 
-class PhotoshootExcelFileReader {
-    fun read(excelFile: File): List<Timestamp> {
+class PhotoshootExcelFileReader(
+    val excelFile: File
+) {
+    fun read(): List<Timestamp> {
         val file = FileInputStream(excelFile)
         val workbook: Workbook = XSSFWorkbook(file)
 
@@ -59,6 +61,20 @@ class PhotoshootExcelFileReader {
             }
         }.toList()
 
+    fun readPasswords(): List<String> {
+        val file = FileInputStream(excelFile)
+        val workbook: Workbook = XSSFWorkbook(file)
+
+        val sheet = workbook.getSheetAt(studentsSheetIndex)
+
+        return sheet.rowIterator().asSequence().mapIndexedNotNull { index, row ->
+            row.getCell(passwordColumnIndex).stringValueOrNull?.takeIf { index == 0 || row.getCell(ficheColumnIndex).intValueOrNull != null }
+        }
+            .filter { it.isNotEmpty() }
+            .toList()
+    }
+
+
     companion object {
         const val timestampSheetIndex = 2
         const val idCellIndex = 0
@@ -66,5 +82,8 @@ class PhotoshootExcelFileReader {
         const val groupCellIndex = 2
         const val timestampStartIndex = 6
         const val timestampEndIndex = 7
+        const val studentsSheetIndex = 1
+        const val passwordColumnIndex = 12
+        const val ficheColumnIndex = 5
     }
 }

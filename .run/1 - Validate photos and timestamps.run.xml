@@ -4,7 +4,7 @@
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
     <option name="MAIN_CLASS_NAME" value="org.brindamour.Main" />
     <module name="photos.main" />
-    <option name="PROGRAM_PARAMETERS" value="&quot;$USER_HOME$/Desktop/Brindamour/2023-10-24/&quot; -x" />
+    <option name="PROGRAM_PARAMETERS" value="&quot;$USER_HOME$/Desktop/Brindamour/Finissants/&quot; -x" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>

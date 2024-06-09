@@ -14,6 +14,7 @@ object Main {
         val createUploadFolders = args.any { it == "-e" }
         val isValidateStudentsPhotoCount = args.any { it == "-p" }
         val isExportGpi = args.any { it == "-s" }
+        val isCreatePasswordFile = args.any { it == "-w" }
 
         if (args.lastIndex < timestampFileIndex) {
             println("Aucun fichier excel spécifié.")
@@ -25,7 +26,7 @@ object Main {
             validateStudentsPhotoCount(args, photoshootDirectory)
         } else if (isExportGpi) {
             exportGpi(args, photoshootDirectory)
-        } else {
+        }  else {
             val timestampFile = File(args[timestampFileIndex])
                     .listFiles { _, name -> name.endsWith(".xlsx") }?.firstOrNull()
 
@@ -34,10 +35,14 @@ object Main {
                 exitProcess(-1)
             }
 
-            val photoshootReader = PhotoshootExcelFileReader()
-            val timestamps = photoshootReader.read(timestampFile)
+            val photoshootReader = PhotoshootExcelFileReader(timestampFile)
+            val timestamps = photoshootReader.read()
 
-            if (isSimpleExcelExport) {
+
+            if (isCreatePasswordFile) {
+                exportPasswordFile(photoshootDirectory, photoshootReader)
+            }
+            else if (isSimpleExcelExport) {
 
                 val studentPhotoPath = File(photoshootDirectory, "Eleves")
                 val studentsPhotosReader = StudentsPhotosReader()
@@ -66,6 +71,20 @@ object Main {
                     val studentsPhotos = studentsPhotosReader.readStudentsPhotos(studentPhotoPath)
                     createUploadDirectoryStructure(photoshootDirectory, studentsPhotos, timestampMatch)
                 }
+            }
+        }
+    }
+
+    private fun exportPasswordFile(
+        photoshootDirectory: File,
+        photoshootReader: PhotoshootExcelFileReader,
+    ) {
+        val passwordFile = File(photoshootDirectory, "passwords.txt")
+        val passwords = photoshootReader.readPasswords()
+        passwordFile.bufferedWriter().use { out ->
+            passwords.forEach {
+                out.write(it)
+                out.newLine()
             }
         }
     }

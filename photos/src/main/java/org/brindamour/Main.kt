@@ -27,20 +27,14 @@ object Main {
         } else if (isExportGpi) {
             exportGpi(args, photoshootDirectory)
         }  else {
-            val timestampFile = File(args[timestampFileIndex])
-                    .listFiles { _, name -> name.endsWith(".xlsx") }?.firstOrNull()
-
-            if (timestampFile == null) {
-                println("Aucun fichier excel trouvé dans ce répertoire.")
-                exitProcess(-1)
-            }
+            val timestampFile = getFirstTimestampFile(args[timestampFileIndex])
 
             val photoshootReader = PhotoshootExcelFileReader(timestampFile)
             val timestamps = photoshootReader.read()
 
 
             if (isCreatePasswordFile) {
-                exportPasswordFile(photoshootDirectory, photoshootReader)
+                exportPasswordFile(photoshootDirectory)
             }
             else if (isSimpleExcelExport) {
 
@@ -75,10 +69,24 @@ object Main {
         }
     }
 
+    private fun getFirstTimestampFile(timestampFilePath: String): File {
+        val timestampFile = File(timestampFilePath)
+            .listFiles { _, name -> name.endsWith(".xlsx") }?.firstOrNull()
+
+        if (timestampFile == null) {
+            println("Aucun fichier excel trouvé dans ce répertoire.")
+            exitProcess(-1)
+        }
+
+        return timestampFile
+    }
+
     private fun exportPasswordFile(
         photoshootDirectory: File,
-        photoshootReader: PhotoshootExcelFileReader,
     ) {
+        val timestampFile = getMasterTimestampFile(photoshootDirectory)
+
+        val photoshootReader = PhotoshootExcelFileReader(timestampFile)
         val passwordFile = File(photoshootDirectory, "passwords.txt")
         val passwords = photoshootReader.readPasswords()
         passwordFile.bufferedWriter().use { out ->
@@ -90,13 +98,7 @@ object Main {
     }
 
     private fun validateStudentsPhotoCount(args: Array<String>, photoshootDirectory: File) {
-        val timestampFile = File(args[timestampFileIndex])
-                .listFiles { _, name -> name.startsWith("Master") && name.endsWith(".xlsx") }?.firstOrNull()
-
-        if (timestampFile == null) {
-            println("Aucun fichier excel trouvé dans ce répertoire.")
-            exitProcess(-1)
-        }
+        val timestampFile = getMasterTimestampFile(File(args[timestampFileIndex]))
 
         val studentReader = StudentsExcelFileReader()
         val students = studentReader.read(timestampFile)
@@ -117,13 +119,7 @@ object Main {
     }
 
     private fun exportGpi(args: Array<String>, photoshootDirectory: File) {
-        val timestampFile = File(args[timestampFileIndex])
-                .listFiles { _, name -> name.startsWith("Master") && name.endsWith(".xlsx") }?.firstOrNull()
-
-        if (timestampFile == null) {
-            println("Aucun fichier excel trouvé dans ce répertoire.")
-            exitProcess(-1)
-        }
+        val timestampFile = getMasterTimestampFile(File(args[timestampFileIndex]))
 
         val studentReader = StudentsExcelFileReader()
         val students = studentReader.read(timestampFile)
@@ -139,12 +135,24 @@ object Main {
             if (student.isStudentKnown) {
                 val studentDirectory = File(uploadDirectory, "Classe ${student.group}/Eleve ${student.id}")
                 studentDirectory.listFiles { _, name -> name.endsWith(".jpg") }?.sortedBy { it.name }?.firstOrNull()
-                        ?.let {
-                            val targetFile = File(targetDirectory, "${student.id}.jpg")
-                            it.copyTo(targetFile)
-                        }
+                    ?.let {
+                        val targetFile = File(targetDirectory, "${student.id}.jpg")
+                        it.copyTo(targetFile)
+                    }
             }
         }
+    }
+
+    private fun getMasterTimestampFile(photoshootDirectory: File): File {
+        val masterTimestampFile = photoshootDirectory
+            .listFiles { _, name -> name.startsWith("Master") && name.endsWith(".xlsx") }?.firstOrNull()
+
+        if (masterTimestampFile == null) {
+            println("Aucun fichier excel trouvé dans ce répertoire.")
+            exitProcess(-1)
+        }
+
+        return masterTimestampFile
     }
 
     private fun createNameValidationFiles(photoshootDirectory: File, timestampMatches: List<TimestampMatch>) {

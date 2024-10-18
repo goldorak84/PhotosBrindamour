@@ -1,10 +1,10 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="1 - Validate photos and timestamps" type="Application" factoryName="Application">
-    <option name="ALTERNATIVE_JRE_PATH" value="corretto-17" />
+    <option name="ALTERNATIVE_JRE_PATH" value="BUNDLED"/>
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
     <option name="MAIN_CLASS_NAME" value="org.brindamour.Main" />
     <module name="photos.main" />
-    <option name="PROGRAM_PARAMETERS" value="&quot;$USER_HOME$/Desktop/Brindamour/Finissants/&quot; -x" />
+    <option name="PROGRAM_PARAMETERS" value="&quot;$PROJECT_DIR$/../../Brindamour/2024-2025/2024-09-13/&quot; -x"/>
     <method v="2">
       <option name="Make" enabled="true" />
     </method>

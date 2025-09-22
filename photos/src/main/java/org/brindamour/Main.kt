@@ -26,17 +26,15 @@ object Main {
             validateStudentsPhotoCount(args, photoshootDirectory)
         } else if (isExportGpi) {
             exportGpi(args, photoshootDirectory)
-        }  else {
+        } else if (isCreatePasswordFile) {
+            exportPasswordFile(photoshootDirectory)
+        } else {
             val timestampFile = getFirstTimestampFile(args[timestampFileIndex])
 
             val photoshootReader = PhotoshootExcelFileReader(timestampFile)
             val timestamps = photoshootReader.read()
 
-
-            if (isCreatePasswordFile) {
-                exportPasswordFile(photoshootDirectory)
-            }
-            else if (isSimpleExcelExport) {
+            if (isSimpleExcelExport) {
 
                 val studentPhotoPath = File(photoshootDirectory, "Eleves")
                 val studentsPhotosReader = StudentsPhotosReader()
@@ -171,12 +169,12 @@ object Main {
     }
 
     private fun matchStudentPhotosAndTimestamps(
-            photoshootDirectory: File,
-            studentsPhotos: List<StudentPhoto>,
-            timestamps: List<Timestamp>,
-            createUploadFolders: Boolean,
+        photoshootDirectory: File,
+        studentsPhotos: List<StudentPhoto>,
+        timestamps: List<Timestamp>,
+        createUploadFolders: Boolean,
     ) {
-        if(createUploadFolders) {
+        if (createUploadFolders) {
             println("Création du fichier Upload et association des photos...")
         } else {
             println("Association des photos...")
@@ -191,34 +189,34 @@ object Main {
 
         studentsPhotos.forEach studentLoop@{ studentPhoto ->
             timestamps.singleOrNull { timestamp -> studentPhoto.date >= timestamp.timestampStart && studentPhoto.date < timestamp.timestampEnd }
-                    ?.let { timestamp ->
+                ?.let { timestamp ->
 
-                        if (!timestamp.isStudentKnown) {
-                            println("Photo(${studentPhoto.file.name}, barcode ${timestamp.id}) trouvée, mais aucune fiche d'élève trouvée")
-                        } else if (createUploadFolders) {
-                            val classroomFolder = File(uploadFolder, "Classe ${timestamp.group}")
-                            if (!classroomFolder.exists()) {
-                                Files.createDirectory(classroomFolder.toPath())
-                            }
-
-                            val studentFolder = File(classroomFolder, "Eleve ${timestamp.id}")
-                            if (!studentFolder.exists()) {
-                                Files.createDirectory(studentFolder.toPath())
-                            }
-
-                            val studentPhotoFile =
-                                    File(
-                                            studentFolder,
-                                            "${timestamp.id}_${timestamp.name?.unaccent()}_${studentPhoto.file.name}"
-                                    )
-                            studentPhoto.file.copyTo(studentPhotoFile)
+                    if (!timestamp.isStudentKnown) {
+                        println("Photo(${studentPhoto.file.name}, barcode ${timestamp.id}) trouvée, mais aucune fiche d'élève trouvée")
+                    } else if (createUploadFolders) {
+                        val classroomFolder = File(uploadFolder, "Classe ${timestamp.group}")
+                        if (!classroomFolder.exists()) {
+                            Files.createDirectory(classroomFolder.toPath())
                         }
-                    } ?: run {
+
+                        val studentFolder = File(classroomFolder, "Eleve ${timestamp.id}")
+                        if (!studentFolder.exists()) {
+                            Files.createDirectory(studentFolder.toPath())
+                        }
+
+                        val studentPhotoFile =
+                            File(
+                                studentFolder,
+                                "${timestamp.id}_${timestamp.name?.unaccent()}_${studentPhoto.file.name}"
+                            )
+                        studentPhoto.file.copyTo(studentPhotoFile)
+                    }
+                } ?: run {
                 println("Photo ${studentPhoto.file.name} non trouvée dans le fichier timestamp")
             }
         }
 
-        if(createUploadFolders) {
+        if (createUploadFolders) {
             println("Création du fichier Upload et association des photos terminée!")
         } else {
             println("Association des photos terminée!")
@@ -226,9 +224,9 @@ object Main {
     }
 
     private fun createUploadDirectoryStructure(
-            photoshootDirectory: File,
-            studentsPhotos: List<StudentPhoto>,
-            timestampMatches: List<TimestampMatch>
+        photoshootDirectory: File,
+        studentsPhotos: List<StudentPhoto>,
+        timestampMatches: List<TimestampMatch>
     ) {
         println("Création du fichier Upload et association des photos...")
 
@@ -257,10 +255,10 @@ object Main {
                     }
 
                     val studentPhotoFile =
-                            File(
-                                    studentFolder,
-                                    "${match.timestamp.id}_${match.timestamp.name?.unaccent()}_${studentPhoto.file.name}"
-                            )
+                        File(
+                            studentFolder,
+                            "${match.timestamp.id}_${match.timestamp.name?.unaccent()}_${studentPhoto.file.name}"
+                        )
                     studentPhoto.file.copyTo(studentPhotoFile)
 
                     return@studentLoop
